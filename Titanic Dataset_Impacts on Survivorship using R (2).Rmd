@@ -1,0 +1,225 @@
+---
+title: "Titanic Dataset: Impacts on Survivorship using R"
+author: "Sean E. Curl"
+Date: "Due: April 16, 2018"
+output:
+  html_document: default
+  word_document: default
+---
+
+## DATA-SET DESCRIPTION
+The RMS Titanic was a British passenger liner that sank in 1912. Over half of the 2224 passengers lost their lives, making the sinking of the Titanic one of the deadliest peacetime maritime disasters. A number of factors contributed to survivorship.  The attached .csv files document the passengers of this ship, some of their information, and whether they survived.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(ggplot2)
+library(leaps)
+library(car)
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(purrr)
+library(dplyr)
+library(readxl)
+```
+
+## LOAD DATA
+```{r load data}
+train <- read.csv('C:/Users/PC - Main/Desktop/Data Science/train.csv', header=T, na.strings=c("")) # 891 obs. of 12 variables
+test <- read.csv('C:/Users/PC - Main/Desktop/Data Science/test.csv', header=T, na.strings=c("")) # 418 obs. of 11 variables
+```
+
+## DATA DESCRIPTION
+```{r descriptive statistics}
+glimpse(train)
+glimpse(test)
+
+summary(train)
+summary(test)
+```
+
+#### TRAINING SET: 
+- (REMOVED) PassengerId is an ordinal variable and unique. It will be omitted from analysis.
+- Survived is the response variable (0 = not survive; 1 = survived)
+- Pclass is a double variable (1 = Upper; 2 = Middle; 3 = Lower)
+- (REMOVED) 'Name' variable is a character string. The variable contains a title. The title will be extracted and used to create a new 'Title' variable.
+- Sex is a character string variable and will need to be converted to a categorical variable.
+- SibSp is a double (numeric) variable. 
+- Parch is a double (numeric) variable.
+- (REMOVED) 'Ticket' is a character. The variable will not be used for this model.
+- 'Fare' variable is a double and likely would need to be converted into numeric.
+- (REMOVED) Cabin is a character. 
+- Embarked is a character and will need to be converted into a categorical (factor).
+
+#### TESTING SET: Missing the response 'Survived' variable
+
+
+## MISSING VALUES
+Identify any or all missing values in the data-set. Normally, some missing values can be omitted from the data-set depending on the size or by how easy they are to rectify. First, I wanted to take a look visually:
+
+```{r dealing with missing values}
+# visualize missing valus as a ggplot
+train %>% 
+  map_dbl(~sum(is.na(.)))
+
+library(Amelia)
+missmap(train, main = "Missing values vs observed")
+```
+
+I can see that there are missing values for the training data-set are: Embarked, Age, and Cabin.
+
+The Cabin is a variable that can NOT be easy to rectify as a result of it being a string and the number of missing values. Thus, Cabin will be omitted from the model. All other NA variables can be remedied by using the median or max value within each variables column.
+
+```{r}
+# Drill down to two variables with missing values
+filter(train, is.na(Embarked)) # Records missing are: 62 and 830
+
+# Corrective measures for missing values in Age and Embarked NA's
+
+# Age
+train$Age[is.na(train$Age)] <- median(train$Age, na.rm=T)
+
+# Embarked
+train <- train %>%
+              mutate(Embarked = factor(ifelse(is.na(Embarked), names(which.max(table(train$Embarked))), Embarked))) %>%
+              group_by(Pclass, Embarked)
+
+# Result
+filter(train, is.na(Embarked))
+filter(train, is.na(Age))
+
+# Note, there's one value in the testing data-set for Fare missing:
+filter(train, is.na(Fare)) # Record missing is: 1044	
+```
+
+## TRANSFORMATION
+
+```{r data manipulation Title}
+# Reduce the number of categorical variables associated with 'Title'
+
+# Clean the Name variable, pulling out the title
+
+names <- train$Name
+title <-  gsub("^.*, (.*?)\\..*$", "\\1", names)
+train$Title <- title
+table(train$Title)
+
+# Constructing the new Title variable
+
+train <- train %>%
+          mutate(Title = factor(Title)) %>%
+          mutate(Title = fct_collapse(Title, "Miss" = c("Mlle", "Ms"), "Mrs" = "Mme", 
+                                      "Officer" = c( "Major", "Dr", "Capt", "Col", "Rev"),
+                                      "Noble" = c("Lady", "Don", "Dona", "the Countess", "Don", "Sir", "Jonkheer")))
+
+table(train$Title)
+train$Title <- as.factor(train$Title)
+```
+
+Created six categories for Title: (1)Officer (2) Royalty (3) Miss (4) Mrs (5) Mr (6) Master. This will allow me to interpret better to see if the passengers title had an effect on their survival.
+
+```{r}
+glimpse(train)
+
+# Contrast is only allowed for factors. I'll check their classification.
+contrasts(train$Sex)
+contrasts(train$Embarked)
+```
+
+## BASELINE
+
+A baseline needs to be established using the actual proportion from the training set of those that survived vs. didn't survive. The baseline will represent the accuracy from which our model will be judged. If the model preforms worse (i.e. less accurate) than the baseline percentage of the training set, there's no point in modeling the data-set. You'd be better off guessing randomly whether a passenger will survive the sinking of the Titanic.
+
+```{r baseline of training data}
+round(prop.table(table(train$Survived)*100),digits = 1)
+```
+
+Therefore, as a baseline, passengers from the training data-set had a ~0.4 chance of surviving the sinking of the Titanic. I want my model to NOT predict lower than ~0.4.
+
+## LOGISTIC MODEL
+```{r modeling}
+# diagnostics are not needed. Logistic model does not share the same i.i.d. assumptions as OLS
+
+# Correlation check:
+library(GGally)
+train %>%
+  select(-PassengerId, -Name, -Ticket, -Cabin) %>%
+  mutate_all(as.numeric) %>%
+  select(everything()) %>%
+  ggcorr(method = c("pairwise","spearman"), label = FALSE, angle = -0, hjust = 0.2) +
+  coord_flip()
+
+cor(train$Parch, train$SibSp) #0.4148377
+cor(train$SibSp, train$Fare) #0.159651
+cor(train$Parch, train$Fare) # 0.2162249
+
+train1 <- train %>%
+  select(c("Survived", "Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Embarked"))
+
+# Full Model
+log.reg <- glm(Survived ~., family = binomial(link=logit), data = train1)
+summary(log.reg)
+```
+
+## STEPWISE VARIABLE SELECTION
+```{r}
+# Choose the best model via the stepwise procedure
+null = glm(Survived ~ 1, family = binomial(link=logit), data = train1)
+full <- glm(Survived ~., family = binomial(link=logit), data = train1)
+step(null, scope=list(lower=null, upper=full), direction="both")
+
+# Best Model: Stepwise (lowest AIC)
+# glm(formula = Survived ~ Sex + Pclass + Age + SibSp, family = binomial(link = logit), data = train1)
+
+# According to this reduced model. Sex, Pclass, Age, and SibSp are the most significant predictors for the response variable.
+```
+
+## REDUCED MODEL
+```{r}
+# Reduced model
+red.log <- glm(formula = Survived ~ Sex + Pclass + Age + SibSp, family = binomial(link = logit), data = train1)
+summary(red.log)
+# All predictors are significant.
+
+anova(log.reg, red.log)
+anova(red.log, test="Chisq")
+```
+
+The difference between the full model and the reduced models deviance shows how well each model is doing. The 2nd model is the reduced model. I can see that this model has a lower deviance of -6.2955 when compared to the full model. 
+
+The Chi Square anova test (reduced vs. NULL model) shows that the by adding one variable at a time, we can see which variable lowers the models deviance, and by how much. Therefore, Sex lowers the deviance of the reduced model the most, followed by Pclass, Age, and SibSp.
+
+The reduced model has a slightly lower AIC value: 801.23 vs. 804.93. 
+
+The coefficients are log-odds and are interpreted as meaning: if the passengers sex is male, holding all else constant, survival can be expected to decrease log-odds -2.739477 times.
+
+- Pclass = -1.17 
+- Age = -0.039
+- SibSp = -0.3544
+
+Using this reduced logistic model, I'll conduct cross-validation against the training data-set:
+
+## CROSS-VALIDATION
+```{r}
+# Cross-validation of the fitted model on the training data.
+# How well does the reduced model predict within the training data?
+cv.train <- train1[1:446,]
+cv.test <- train1[445:891,]
+
+# Classify a passenger as having survived if the probability of that exceeds 0.6.
+fitted.results = predict( red.log, data.frame(cv.test), type="response" )
+fitted.results = 1*( fitted.results > 0.5 )
+misClasificError <- mean(fitted.results != cv.test$Survived)
+
+table(fitted.results, cv.test$Survived )
+print(paste('Accuracy',1-misClasificError))
+
+# Accuracy = (113+235)/(235+56+43+113) = 0.77
+error <- 1-0.778523489932886
+error
+# Error Rate = 0.2214765
+```
+
+This is not a perfect result, there are some false positive and false negative results. Overall, I correctly predicted (113+235)/(235+56+43+113) = 77.852% of survivals. The training error rate is only 22.1%. However, among those who are DID NOT surivive, this model correctly predicted a only little over 1/4. The True Postive (TP) rate needs improvement. Other cross-validation methods such as k-fold cross-validation could yield better results.
+```
