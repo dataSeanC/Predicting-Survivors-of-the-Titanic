@@ -8,7 +8,7 @@ output:
 ---
 
 ## DATA-SET DESCRIPTION
-The RMS Titanic was a British passenger liner that sank in 1912. Over half of the 2224 passengers lost their lives, making the sinking of the Titanic one of the deadliest peacetime maritime disasters. A number of factors contributed to survivorship.  The attached .csv files document the passengers of this ship, some of their information, and whether they survived.
+The RMS Titanic was a British passenger liner that sank in 1912. Over half of the 2224 passengers lost their lives, making the sinking of the Titanic one of the deadliest peacetime maritime disasters. A number of factors contributed to survivorship.  The .csv files, train/test, document the passengers of this ship, some of their information, and whether they survived.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -26,8 +26,8 @@ library(readxl)
 
 ## LOAD DATA
 ```{r load data}
-train <- read.csv('C:/Users/PC - Main/Desktop/Data Science/train.csv', header=T, na.strings=c("")) # 891 obs. of 12 variables
-test <- read.csv('C:/Users/PC - Main/Desktop/Data Science/test.csv', header=T, na.strings=c("")) # 418 obs. of 11 variables
+train <- read.csv('./train.csv', header=T, na.strings=c("")) # 891 obs. of 12 variables
+test <- read.csv('./test.csv', header=T, na.strings=c("")) # 418 obs. of 11 variables
 ```
 
 ## DATA DESCRIPTION
@@ -56,7 +56,7 @@ summary(test)
 
 
 ## MISSING VALUES
-Identify any or all missing values in the data-set. Normally, some missing values can be omitted from the data-set depending on the size or by how easy they are to rectify. First, I wanted to take a look visually:
+Identify any or all missing values in the data-set. Normally, some missing values can be omitted from the data-set depending on the size or by how easy they are to rectify. First, I wanted to take a look using visualization:
 
 ```{r dealing with missing values}
 # visualize missing valus as a ggplot
@@ -69,7 +69,7 @@ missmap(train, main = "Missing values vs observed")
 
 I can see that there are missing values for the training data-set are: Embarked, Age, and Cabin.
 
-The Cabin is a variable that can NOT be easy to rectify as a result of it being a string and the number of missing values. Thus, Cabin will be omitted from the model. All other NA variables can be remedied by using the median or max value within each variables column.
+The Cabin is a variable which is NOT easy to rectify as a result of its formating (combination string and the number) of missing values. Therefore, Cabin will be omitted from the model. All other NA variables could be remedied by using the median or max value within each variables column.
 
 ```{r}
 # Drill down to two variables with missing values
@@ -117,7 +117,7 @@ table(train$Title)
 train$Title <- as.factor(train$Title)
 ```
 
-Created six categories for Title: (1)Officer (2) Royalty (3) Miss (4) Mrs (5) Mr (6) Master. This will allow me to interpret better to see if the passengers title had an effect on their survival.
+Created six categories for Title: (1)Officer (2) Royalty (3) Miss (4) Mrs (5) Mr (6) Master. This will allow me to interpret the dataset and to see if the passengers title had an effect on their survival rate.
 
 ```{r}
 glimpse(train)
@@ -135,7 +135,7 @@ A baseline needs to be established using the actual proportion from the training
 round(prop.table(table(train$Survived)*100),digits = 1)
 ```
 
-Therefore, as a baseline, passengers from the training data-set had a ~0.4 chance of surviving the sinking of the Titanic. I want my model to NOT predict lower than ~0.4.
+Therefore, as a baseline, passengers from the training data-set had a ~0.4 chance of surviving the sinking of the Titanic. I want my model to predict near the baseline ~0.4 survival rate or ~40%.
 
 ## LOGISTIC MODEL
 ```{r modeling}
