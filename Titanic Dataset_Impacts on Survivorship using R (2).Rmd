@@ -188,7 +188,7 @@ anova(red.log, test="Chisq")
 
 The difference between the full model and the reduced models deviance shows how well each model is doing. The 2nd model is the reduced model. I can see that this model has a lower deviance of -6.2955 when compared to the full model. 
 
-The Chi Square anova test (reduced vs. NULL model) shows that the by adding one variable at a time, we can see which variable lowers the models deviance, and by how much. Therefore, Sex lowers the deviance of the reduced model the most, followed by Pclass, Age, and SibSp.
+The Chi Square anova test (reduced vs. NULL model) shows that the by adding one variable at a time, we can see which variable lowers the models deviance and by how much. Therefore, the variable 'Sex' lowers the deviance of the reduced model the most, followed closely by 'Pclass,' 'Age', and 'SibSp.'
 
 The reduced model has a slightly lower AIC value: 801.23 vs. 804.93. 
 
@@ -221,5 +221,5 @@ error
 # Error Rate = 0.2214765
 ```
 
-This is not a perfect result, there are some false positive and false negative results. Overall, I correctly predicted (113+235)/(235+56+43+113) = 77.852% of survivals. The training error rate is only 22.1%. However, among those who are DID NOT surivive, this model correctly predicted a only little over 1/4. The True Postive (TP) rate needs improvement. Other cross-validation methods such as k-fold cross-validation could yield better results.
+There's a blend of Type I and Type II errors. Overall, the model correctly predicted (113+235)/(235+56+43+113) = 77.852% of survivals. The training error rate is only 22.1%. However, among those who are DID NOT surivive, this model correctly predicted a only little over 1/4. The True Postive (TP) rate needs improvement. Other cross-validation methods such as k-fold cross-validation could yield better results.
 ```
